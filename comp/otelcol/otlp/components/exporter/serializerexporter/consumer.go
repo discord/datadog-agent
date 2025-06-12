@@ -127,8 +127,10 @@ func apiTypeFromTranslatorType(typ otlpmetrics.DataType) metrics.APIMetricType {
 		return metrics.APICountType
 	case otlpmetrics.Gauge:
 		return metrics.APIGaugeType
+	case otlpmetrics.Rate:
+		return metrics.APIRateType
 	}
-	panic(fmt.Sprintf("unreachable: received non-count non-gauge type: %d", typ))
+	panic(fmt.Sprintf("unreachable: received non-count non-gauge non-rate type: %d", typ))
 }
 
 func (c *serializerConsumer) ConsumeTimeSeries(ctx context.Context, dimensions *otlpmetrics.Dimensions, typ otlpmetrics.DataType, ts uint64, value float64) {
@@ -136,6 +138,16 @@ func (c *serializerConsumer) ConsumeTimeSeries(ctx context.Context, dimensions *
 	if !ok {
 		msrc = metrics.MetricSourceOpenTelemetryCollectorUnknown
 	}
+	var interval int64
+	// We should use a const/type instead of a well-known string here,
+	// but this works for now and simplifies the dependency graph.
+	if rateInterval := ctx.Value("__rate_interval"); rateInterval != nil {
+		interval = rateInterval.(int64)
+		if interval > 0 {
+			value = value / float64(interval)
+		}
+	}
+
 	c.series = append(c.series,
 		&metrics.Serie{
 			Name:     dimensions.Name(),
@@ -143,7 +155,7 @@ func (c *serializerConsumer) ConsumeTimeSeries(ctx context.Context, dimensions *
 			Tags:     tagset.CompositeTagsFromSlice(c.enricher.Enrich(ctx, c.extraTags, dimensions)),
 			Host:     dimensions.Host(),
 			MType:    apiTypeFromTranslatorType(typ),
-			Interval: 0, // OTLP metrics do not have an interval.
+			Interval: interval,
 			Source:   msrc,
 		},
 	)
