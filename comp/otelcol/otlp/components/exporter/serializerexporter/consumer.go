@@ -139,11 +139,11 @@ func (c *serializerConsumer) ConsumeTimeSeries(ctx context.Context, dimensions *
 		msrc = metrics.MetricSourceOpenTelemetryCollectorUnknown
 	}
 	var interval int64
-	// We should use a const/type instead of a well-known string here,
+	// We should use an empty type instead of a well-known string here,
 	// but this works for now and simplifies the dependency graph.
 	if rateInterval := ctx.Value("__rate_interval"); rateInterval != nil {
 		interval = rateInterval.(int64)
-		if interval > 0 {
+		if interval > 0 && (typ == otlpmetrics.Count || typ == otlpmetrics.Rate) {
 			value = value / float64(interval)
 		}
 	}
