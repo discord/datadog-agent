@@ -99,6 +99,10 @@ func newFactoryForAgentWithType(
 	if !pkgdatadog.MetricRemappingDisabledFeatureGate.IsEnabled() {
 		options = append(options, otlpmetrics.WithOTelPrefix())
 	}
+	if pkgdatadog.AttributeSliceMultiTagExportingFeatureGate.IsEnabled() {
+		fmt.Println("Adding WithEncodeSliceMetadataAsTags from AttributeSliceMultiTagExportingFeatureGate")
+		options = append(options, otlpmetrics.WithEncodeSliceMetadataAsTags())
+	}
 
 	f := &factory{
 		s:            s,
@@ -138,6 +142,10 @@ func NewFactoryForOSSExporter(typ component.Type, statsIn chan []byte) exp.Facto
 	var options []otlpmetrics.TranslatorOption
 	if !pkgdatadog.MetricRemappingDisabledFeatureGate.IsEnabled() {
 		options = append(options, otlpmetrics.WithRemapping())
+	}
+	if pkgdatadog.AttributeSliceMultiTagExportingFeatureGate.IsEnabled() {
+		fmt.Println("Adding WithEncodeSliceMetadataAsTags from AttributeSliceMultiTagExportingFeatureGate")
+		options = append(options, otlpmetrics.WithEncodeSliceMetadataAsTags())
 	}
 
 	f := &factory{

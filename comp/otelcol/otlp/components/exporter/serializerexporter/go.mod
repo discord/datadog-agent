@@ -399,3 +399,5 @@ replace (
 	github.com/DataDog/datadog-agent/test/new-e2e => ../../../../../../test/new-e2e
 	github.com/DataDog/datadog-agent/test/otel => ../../../../../../test/otel
 )
+
+replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/datadog v0.133.0 => github.com/discord/opentelemetry-collector-contrib/pkg/datadog 528f6a15dc8bc8fb30a2ccbf7d335b1cdfac03d2
