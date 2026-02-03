@@ -28,27 +28,22 @@ type collectorConsumer struct {
 
 var _ SerializerConsumer = (*collectorConsumer)(nil)
 
-func (c *collectorConsumer) addRuntimeTelemetryMetric(_ string, languageTags []string) {
+func (c *collectorConsumer) addRuntimeTelemetryMetric(hostname string, languageTags []string) {
 	timestamp := c.getPushTime()
 	buildTags := tagsFromBuildInfo(c.buildInfo)
 	series := c.series
-	for host := range c.seenHosts {
-		// Report the host as running
-		runningMetric := exporterDefaultMetrics("metrics", host, timestamp, buildTags)
-		series = append(series, runningMetric)
-	}
 
 	var tags []string
 	tags = append(tags, buildTags...)
 	for tag := range c.seenTags {
 		tags = append(tags, tag)
 	}
-	runningMetrics := exporterDefaultMetrics("metrics", "", timestamp, tags)
+	runningMetrics := exporterDefaultMetrics("metrics", hostname, timestamp, tags)
 	series = append(series, runningMetrics)
 
 	for _, lang := range languageTags {
 		tags := append(buildTags, "language:"+lang) //nolint:gocritic
-		runningMetric := exporterDefaultMetrics("runtime_metrics", "", timestamp, tags)
+		runningMetric := exporterDefaultMetrics("runtime_metrics", hostname, timestamp, tags)
 		series = append(series, runningMetric)
 	}
 	c.series = series

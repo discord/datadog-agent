@@ -81,6 +81,10 @@ func (d *Dimensions) OriginProductDetail() OriginProductDetail {
 func getTags(labels pcommon.Map, encodeSliceMetadataAsTags bool) []string {
 	tags := make([]string, 0, labels.Len())
 	labels.Range(func(key string, value pcommon.Value) bool {
+		// we specifically ignore otelcol-internal datadog metadata
+		if strings.HasPrefix(key, "datadog.") {
+			return true
+		}
 		if encodeSliceMetadataAsTags && value.Type() == pcommon.ValueTypeSlice {
 			for _, item := range value.Slice().All() {
 				tags = append(tags, utils.FormatKeyValueTag(key, item.AsString()))
