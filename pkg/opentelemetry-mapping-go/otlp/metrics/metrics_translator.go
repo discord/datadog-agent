@@ -40,7 +40,7 @@ import (
 const (
 	metricName             string = "metric name"
 	errNoBucketsNoSumCount string = "no buckets mode and no send count sum are incompatible"
-	RateIntervalKey        string = "__rate_interval"
+	RateIntervalKey        string = "datadog.interval"
 
 	// intervalTolerance is the tolerance for interval calculation in seconds
 	// We use 0.05 seconds as tolerance to allow for some jitter.
@@ -187,13 +187,13 @@ func (t *Translator) mapNumberMetrics(
 			continue
 		}
 
-		pointDims := dims.WithAttributeMap(p.Attributes(), t.cfg.EncodeSliceMetadataAsTags)
-
 		var rateInterval int64
 		if rateValue, exists := p.Attributes().Get(RateIntervalKey); exists {
 			rateInterval = rateValue.Int()
 			p.Attributes().Remove(RateIntervalKey)
 		}
+
+		pointDims := dims.WithAttributeMap(p.Attributes(), t.cfg.EncodeSliceMetadataAsTags)
 
 		var val float64
 		switch p.ValueType() {
