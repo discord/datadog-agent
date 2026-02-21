@@ -108,6 +108,12 @@ func TestAddTags(t *testing.T) {
 	assert.ElementsMatch(t, []string{"key:val"}, testDims.tags)
 }
 
+func TestAddTags2(t *testing.T) {
+	dimsWithTags := testDims.AddTags("key1:val1", "key2:val2", "image_tag:3.2.2")
+	assert.ElementsMatch(t, []string{"key:val", "key1:val1", "key2:val2"}, dimsWithTags.tags)
+	assert.ElementsMatch(t, []string{"key:val"}, testDims.tags)
+}
+
 func TestAllFieldsAreCopied(t *testing.T) {
 	dims := &Dimensions{
 		name:     "example.name",

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 
@@ -27,6 +28,8 @@ import (
 const (
 	dimensionSeparator = string(byte(0))
 )
+
+var lastSeenDebug time.Time
 
 // Dimensions of a metric that identify a timeseries uniquely.
 // This is similar to the concept of 'context' in DogStatsD/check metrics.
@@ -104,6 +107,30 @@ func (d *Dimensions) AddTags(tags ...string) *Dimensions {
 	newTags := make([]string, 0, len(tags)+len(d.tags))
 	newTags = append(newTags, tags...)
 	newTags = append(newTags, d.tags...)
+	dump := false
+	for _, tag := range newTags {
+		if strings.HasPrefix(tag, "image_tag") {
+			dump = true
+			break
+		}
+	}
+	if dump {
+		if time.Since(lastSeenDebug) > (10 * time.Second) {
+			lastSeenDebug = time.Now()
+			var b strings.Builder
+			b.WriteRune('[')
+			for i, tag := range newTags {
+				if i != 0 {
+					b.WriteRune(',')
+				}
+				b.WriteRune('"')
+				b.WriteString(tag)
+				b.WriteRune('"')
+			}
+			b.WriteRune(']')
+			fmt.Printf("Encountered searchable image tag in tag set: %s\n", b.String())
+		}
+	}
 	return &Dimensions{
 		name:                d.name,
 		tags:                newTags,

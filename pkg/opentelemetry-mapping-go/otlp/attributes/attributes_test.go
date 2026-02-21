@@ -48,6 +48,7 @@ func TestTagsFromAttributes(t *testing.T) {
 	}
 	attrs := pcommon.NewMap()
 	attrs.FromRaw(attributeMap)
+	attrs.PutEmptySlice("image_tag").AppendEmpty().SetStr("1.20.3")
 
 	assert.ElementsMatch(t, []string{
 		fmt.Sprintf("%s:%s", string(semconv127.ProcessExecutableNameKey), "otelcol"),
@@ -55,6 +56,7 @@ func TestTagsFromAttributes(t *testing.T) {
 		fmt.Sprintf("%s:%s", "kube_daemon_set", "daemon_set_name"),
 		fmt.Sprintf("%s:%s", "ecs_cluster_name", "cluster_arn"),
 		fmt.Sprintf("%s:%s", "service", "service_name"),
+		fmt.Sprintf("%s:%s", "image_tag", "1.20.3"),
 		fmt.Sprintf("%s:%s", "runtime", "cro"),
 		fmt.Sprintf("%s:%s", "env", "prod"),
 		fmt.Sprintf("%s:%s", "container_name", "custom"),

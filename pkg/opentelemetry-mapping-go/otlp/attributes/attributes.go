@@ -18,6 +18,7 @@ package attributes
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -195,9 +196,30 @@ var (
 	}
 )
 
+var lastSeenDebugAT time.Time
+
+// appendAttributeTags appends one or more formatted tags for a key-value pair.
+// Slice values are expanded into separate tags for each element.
+// Empty values are skipped.
+func appendAttributeTags(tags []string, tagKey string, value pcommon.Value) []string {
+	if value.Type() == pcommon.ValueTypeSlice {
+		for _, item := range value.Slice().All() {
+			if v := item.AsString(); v != "" {
+				tags = append(tags, fmt.Sprintf("%s:%s", tagKey, v))
+			}
+		}
+		return tags
+	}
+	if v := value.AsString(); v != "" {
+		tags = append(tags, fmt.Sprintf("%s:%s", tagKey, v))
+	}
+	return tags
+}
+
 // TagsFromAttributes converts a selected list of attributes
 // to a tag list that can be added to metrics.
 func TagsFromAttributes(attrs pcommon.Map) []string {
+	// TODO: accept the slice conversion argument like the non-resource version
 	tags := make([]string, 0, attrs.Len())
 
 	var processAttributes processAttributes
@@ -224,19 +246,31 @@ func TagsFromAttributes(attrs pcommon.Map) []string {
 			systemAttributes.OSType = value.Str()
 		}
 
+		dirty := false
 		// core attributes mapping
-		if datadogKey, found := coreMapping[key]; found && value.Str() != "" {
-			tags = append(tags, fmt.Sprintf("%s:%s", datadogKey, value.Str()))
+		if datadogKey, found := coreMapping[key]; found {
+			dirty = true
+			tags = appendAttributeTags(tags, datadogKey, value)
 		}
 
 		// Kubernetes labels mapping
-		if datadogKey, found := kubernetesMapping[key]; found && value.Str() != "" {
-			tags = append(tags, fmt.Sprintf("%s:%s", datadogKey, value.Str()))
+		if datadogKey, found := kubernetesMapping[key]; found {
+			dirty = true
+			tags = appendAttributeTags(tags, datadogKey, value)
 		}
 
+		founded := false
 		// Kubernetes DD tags
 		if _, found := kubernetesDDTags[key]; found {
-			tags = append(tags, fmt.Sprintf("%s:%s", key, value.Str()))
+			founded = true
+			dirty = true
+			tags = appendAttributeTags(tags, key, value)
+		}
+		if key == "image_tag" || key == "image_tag:" {
+			if time.Since(lastSeenDebugAT) > (10 * time.Second) {
+				lastSeenDebugAT = time.Now()
+				fmt.Printf("Nested attribute check debug: '%s' (type: '%s') (founded: %v) (dirty: %v): %s\n", key, value.Type().String(), founded, dirty, value.AsString())
+			}
 		}
 		return true
 	})

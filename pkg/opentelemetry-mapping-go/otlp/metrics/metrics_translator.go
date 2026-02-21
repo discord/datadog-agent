@@ -67,6 +67,8 @@ var (
 	}
 )
 
+var lastSeenDebugMT time.Time
+
 // inferDeltaInterval calculates the interval for Datadog counts from OTLP delta sums.
 // It returns the interval in seconds if the time difference between start and end timestamps
 // is close to a whole number of seconds (within intervalTolerance), otherwise returns 0.
@@ -837,6 +839,31 @@ func (t *Translator) MapMetrics(ctx context.Context, md pmetric.Metrics, consume
 
 		// Fetch tags from attributes.
 		attributeTags := attributes.TagsFromAttributes(rm.Resource().Attributes())
+		dump := false
+		for _, tag := range attributeTags {
+			if strings.HasPrefix(tag, "image_tag") {
+				dump = true
+				break
+			}
+		}
+		if dump {
+			if time.Since(lastSeenDebugMT) > (10 * time.Second) {
+				lastSeenDebugMT = time.Now()
+				imageTag, ok := rm.Resource().Attributes().Get("image_tag")
+				imageTagType := "unknown"
+				imageTagValue := ""
+				if ok {
+					imageTagType = imageTag.Type().String()
+					imageTagValue = imageTag.AsString()
+				}
+				var bbb strings.Builder
+				rm.Resource().Attributes().Range(func(key string, value pcommon.Value) bool {
+					bbb.WriteString(fmt.Sprintf("'%s':'%s',", key, value.AsString()))
+					return true
+				})
+				fmt.Printf("Attribute check new encountered image tag typed '%s' (value: '%s'): %s ----- FULL ATTRIBUTE DUMP ----- %s\n", imageTagType, imageTagValue, attributeTags, bbb.String())
+			}
+		}
 		ilms := rm.ScopeMetrics()
 		rattrs := rm.Resource().Attributes()
 		for j := 0; j < ilms.Len(); j++ {
