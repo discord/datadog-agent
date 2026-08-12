@@ -75,6 +75,12 @@ func mapNumberMetrics(
 			continue
 		}
 
+		var rateInterval int64
+		if rateValue, exists := p.Attributes().Get(RateIntervalKey); exists {
+			rateInterval = rateValue.Int()
+			p.Attributes().Remove(RateIntervalKey)
+		}
+
 		pointDims := dims.WithAttributeMap(p.Attributes())
 		var val float64
 		switch p.ValueType() {
@@ -95,6 +101,13 @@ func mapNumberMetrics(
 		}
 
 		pointDt := dt
+		consumerCtx := ctx
+		if rateInterval > 0 && dt == Count {
+			pointDt = Rate
+			// We should use an empty type instead of a well-known string here,
+			// but this works for now and simplifies the dependency graph.
+			consumerCtx = context.WithValue(consumerCtx, RateIntervalKey, rateInterval)
+		}
 
 		// Check rate attribute and change metric type if necessary and convert value
 		if asType, ok := p.Attributes().Get(deltaSumRateAttributeKey); ok {
@@ -137,7 +150,7 @@ func mapNumberMetrics(
 			}
 		}
 
-		consumer.ConsumeTimeSeries(ctx, pointDims, pointDt, uint64(p.Timestamp()), interval, val)
+		consumer.ConsumeTimeSeries(consumerCtx, pointDims, pointDt, uint64(p.Timestamp()), interval, val)
 	}
 }
 

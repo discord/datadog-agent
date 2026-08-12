@@ -168,11 +168,20 @@ func apiTypeFromTranslatorType(typ otlpmetrics.DataType) metrics.APIMetricType {
 	panic(fmt.Sprintf("unreachable: received unexpected metric type: %d", typ))
 }
 
-func (c *serializerConsumer) ConsumeTimeSeries(_ context.Context, dimensions *otlpmetrics.Dimensions, typ otlpmetrics.DataType, ts uint64, interval int64, value float64) {
+func (c *serializerConsumer) ConsumeTimeSeries(ctx context.Context, dimensions *otlpmetrics.Dimensions, typ otlpmetrics.DataType, ts uint64, interval int64, value float64) {
 	msrc, ok := metricOriginsMappings[dimensions.OriginProductDetail()]
 	if !ok {
 		msrc = metrics.MetricSourceOpenTelemetryCollectorUnknown
 	}
+	// We should use an empty type instead of a well-known string here,
+	// but this works for now and simplifies the dependency graph.
+	if rateInterval := ctx.Value(otlpmetrics.RateIntervalKey); rateInterval != nil {
+		interval = rateInterval.(int64)
+		if interval > 0 && (typ == otlpmetrics.Count || typ == otlpmetrics.Rate) {
+			value = value / float64(interval)
+		}
+	}
+
 	c.series = append(c.series,
 		&metrics.Serie{
 			Name:     dimensions.Name(),

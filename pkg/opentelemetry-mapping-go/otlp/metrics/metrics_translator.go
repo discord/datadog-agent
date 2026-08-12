@@ -40,6 +40,13 @@ const (
 	metricName             string = "metric name"
 	errNoBucketsNoSumCount string = "no buckets mode and no send count sum are incompatible"
 
+	// RateIntervalKey is the datapoint-level attribute used to signal that a Count metric
+	// should be exported as a Datadog Rate over the given interval (in seconds). The `datadog.`
+	// prefix is just a naming convention marking it as exporter-internal; it is NOT filtered out
+	// of tags automatically. It is always explicitly removed from the datapoint's attributes
+	// before they are converted into tags, so it never leaks out as a visible tag.
+	RateIntervalKey string = "datadog.interval"
+
 	// intervalTolerance is the tolerance for interval calculation in seconds
 	// We use 0.05 seconds as tolerance to allow for some jitter.
 	intervalTolerance float64 = 0.05
@@ -300,6 +307,12 @@ func (t *defaultTranslator) mapNumberMonotonicMetrics(
 			continue
 		}
 
+		var rateInterval int64
+		if rateValue, exists := p.Attributes().Get(RateIntervalKey); exists {
+			rateInterval = rateValue.Int()
+			p.Attributes().Remove(RateIntervalKey)
+		}
+
 		ts := uint64(p.Timestamp())
 		startTs := uint64(p.StartTimestamp())
 		pointDims := dims.WithAttributeMap(p.Attributes())
@@ -326,18 +339,28 @@ func (t *defaultTranslator) mapNumberMonotonicMetrics(
 			continue
 		}
 
+		dt := Count
+		consumerCtx := ctx
+		if rateInterval > 0 {
+			dt = Rate
+			// We should use an empty type instead of a well-known string here,
+			// but this works for now and simplifies the dependency graph.
+			consumerCtx = context.WithValue(consumerCtx, RateIntervalKey, rateInterval)
+		}
+
 		dx, isFirstPoint, shouldDropPoint := t.prevPts.MonotonicDiff(pointDims, startTs, ts, val)
 		if shouldDropPoint {
 			t.logger.Debug("Dropping point: timestamp is older or equal to timestamp of previous point received", zap.String(metricName, pointDims.name))
 			continue
 		}
 
+		// Todo: Investigate if we should pass a non-zero interval here.
 		if !isFirstPoint {
-			consumer.ConsumeTimeSeries(ctx, pointDims, Count, ts, 0, dx)
+			consumer.ConsumeTimeSeries(consumerCtx, pointDims, dt, ts, 0, dx)
 		} else if i == 0 && shouldConsumeInitialValue(t.cfg.InitialCumulMonoValueMode, startTs, ts) {
 			// We only compute the first point in the timeseries if it is the first value in the datapoint slice.
 			// Todo: Investigate why we don't compute first val if i > 0 and add reason as comment.
-			consumer.ConsumeTimeSeries(ctx, pointDims, Count, ts, 0, val)
+			consumer.ConsumeTimeSeries(consumerCtx, pointDims, dt, ts, 0, val)
 		}
 	}
 }
