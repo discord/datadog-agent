@@ -548,7 +548,7 @@ func (t *defaultTranslator) MapMetrics(ctx context.Context, md pmetric.Metrics, 
 		var seenNonAPMMetrics bool
 
 		// Fetch tags from attributes.
-		attributeTags := attributes.TagsFromAttributes(rm.Resource().Attributes())
+		attributeTags := attributes.TagsFromAttributes(rm.Resource().Attributes(), t.cfg.EncodeSliceMetadataAsTags)
 		ilms := rm.ScopeMetrics()
 		rattrs := rm.Resource().Attributes()
 		for j := 0; j < ilms.Len(); j++ {

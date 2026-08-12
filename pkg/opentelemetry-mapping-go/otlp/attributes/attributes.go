@@ -210,9 +210,29 @@ var (
 	}
 )
 
+// appendAttributeTags appends one or more formatted tags for a key-value pair.
+func appendAttributeTags(tags []string, tagKey string, value pcommon.Value, encodeSliceMetadataAsTags bool) []string {
+	// There is a known "bug" in this function through the use of `Str()` instead of `AsString()`.
+	// We should be using `AsString()` to get SOME representation of a value,
+	// but we do not, so some values will not be turned into tags at all.
+	// The fix is to use `AsString()`, but that changes user-facing behaviour.
+	if encodeSliceMetadataAsTags && value.Type() == pcommon.ValueTypeSlice {
+		for _, item := range value.Slice().All() {
+			if v := item.Str(); v != "" {
+				tags = append(tags, fmt.Sprintf("%s:%s", tagKey, v))
+			}
+		}
+		return tags
+	}
+	if v := value.Str(); v != "" {
+		tags = append(tags, fmt.Sprintf("%s:%s", tagKey, v))
+	}
+	return tags
+}
+
 // TagsFromAttributes converts a selected list of attributes
 // to a tag list that can be added to metrics.
-func TagsFromAttributes(attrs pcommon.Map) []string {
+func TagsFromAttributes(attrs pcommon.Map, encodeSliceMetadataAsTags bool) []string {
 	tags := make([]string, 0, attrs.Len())
 
 	var processAttributes processAttributes
@@ -240,18 +260,18 @@ func TagsFromAttributes(attrs pcommon.Map) []string {
 		}
 
 		// core attributes mapping
-		if datadogKey, found := coreMapping[key]; found && value.Str() != "" {
-			tags = append(tags, fmt.Sprintf("%s:%s", datadogKey, value.Str()))
+		if datadogKey, found := coreMapping[key]; found {
+			tags = appendAttributeTags(tags, datadogKey, value, encodeSliceMetadataAsTags)
 		}
 
 		// Kubernetes labels mapping
-		if datadogKey, found := kubernetesMapping[key]; found && value.Str() != "" {
-			tags = append(tags, fmt.Sprintf("%s:%s", datadogKey, value.Str()))
+		if datadogKey, found := kubernetesMapping[key]; found {
+			tags = appendAttributeTags(tags, datadogKey, value, encodeSliceMetadataAsTags)
 		}
 
 		// Kubernetes DD tags
 		if _, found := KubernetesDDTags[key]; found {
-			tags = append(tags, fmt.Sprintf("%s:%s", key, value.Str()))
+			tags = appendAttributeTags(tags, key, value, encodeSliceMetadataAsTags)
 		}
 		return true
 	})

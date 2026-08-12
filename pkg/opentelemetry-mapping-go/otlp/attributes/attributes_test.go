@@ -49,6 +49,7 @@ func TestTagsFromAttributes(t *testing.T) {
 	}
 	attrs := pcommon.NewMap()
 	attrs.FromRaw(attributeMap)
+	attrs.PutEmptySlice("image_tag").AppendEmpty().SetStr("1.20.3")
 
 	assert.ElementsMatch(t, []string{
 		fmt.Sprintf("%s:%s", string(semconv127.ProcessExecutableNameKey), "otelcol"),
@@ -56,32 +57,33 @@ func TestTagsFromAttributes(t *testing.T) {
 		fmt.Sprintf("%s:%s", "kube_daemon_set", "daemon_set_name"),
 		fmt.Sprintf("%s:%s", "ecs_cluster_name", "cluster_arn"),
 		fmt.Sprintf("%s:%s", "service", "service_name"),
+		fmt.Sprintf("%s:%s", "image_tag", "1.20.3"),
 		fmt.Sprintf("%s:%s", "runtime", "cro"),
 		fmt.Sprintf("%s:%s", "env", "prod"),
 		fmt.Sprintf("%s:%s", "container_name", "custom"),
 		fmt.Sprintf("%s:%s", "custom.team", "otel"),
 		fmt.Sprintf("%s:%s", "kube_cronjob", "cron"),
-	}, TagsFromAttributes(attrs))
+	}, TagsFromAttributes(attrs, true))
 }
 
 func TestNewDeploymentEnvironmentNameConvention(t *testing.T) {
 	attrs := pcommon.NewMap()
 	attrs.PutStr("deployment.environment.name", "staging")
 
-	assert.Equal(t, []string{"env:staging"}, TagsFromAttributes(attrs))
+	assert.Equal(t, []string{"env:staging"}, TagsFromAttributes(attrs, true))
 }
 
 func TestTagsFromAttributesEmpty(t *testing.T) {
 	attrs := pcommon.NewMap()
 
-	assert.Equal(t, []string{}, TagsFromAttributes(attrs))
+	assert.Equal(t, []string{}, TagsFromAttributes(attrs, true))
 }
 
 func TestServiceInstanceIDMapping(t *testing.T) {
 	attrs := pcommon.NewMap()
 	attrs.PutStr(string(semconv127.ServiceInstanceIDKey), "my-instance-123")
 
-	assert.Equal(t, []string{"service.instance.id:my-instance-123"}, TagsFromAttributes(attrs))
+	assert.Equal(t, []string{"service.instance.id:my-instance-123"}, TagsFromAttributes(attrs, true))
 }
 
 func TestContainerTagFromResourceAttributes(t *testing.T) {
