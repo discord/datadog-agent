@@ -136,11 +136,23 @@ func enrichTags(extraTags []string, dimensions *otlpmetrics.Dimensions) []string
 	return enrichedTags
 }
 
-func (c *serializerConsumer) ConsumeSketch(_ context.Context, dimensions *otlpmetrics.Dimensions, ts uint64, interval int64, qsketch *quantile.Sketch) {
+func getMetricSourceFromDimensions(dimensions *otlpmetrics.Dimensions) metrics.MetricSource {
 	msrc, ok := metricOriginsMappings[dimensions.OriginProductDetail()]
 	if !ok {
-		msrc = metrics.MetricSourceOpenTelemetryCollectorUnknown
+		if dimensions.OriginProductDetail() == otlpmetrics.OriginProductDetailUnknown {
+			msrc = metrics.MetricSourceOpenTelemetryCollectorUnknown
+		} else {
+			// this is a hack to indicate that the metric source is a subproduct (service)
+			// and not a true metric source as defined within this codebase
+			// (it gets handled specially in `metricSourceToOriginCategory` and `metricSourceToOriginService`)
+			msrc = metrics.MetricSource(uint16(dimensions.OriginProductDetail()) | (1 << 15))
+		}
 	}
+	return msrc
+}
+
+func (c *serializerConsumer) ConsumeSketch(_ context.Context, dimensions *otlpmetrics.Dimensions, ts uint64, interval int64, qsketch *quantile.Sketch) {
+	msrc := getMetricSourceFromDimensions(dimensions)
 	c.sketches = append(c.sketches, &metrics.SketchSeries{
 		DistributionMetadata: metrics.DistributionMetadata{
 			Name:     dimensions.Name(),
@@ -169,10 +181,7 @@ func apiTypeFromTranslatorType(typ otlpmetrics.DataType) metrics.APIMetricType {
 }
 
 func (c *serializerConsumer) ConsumeTimeSeries(ctx context.Context, dimensions *otlpmetrics.Dimensions, typ otlpmetrics.DataType, ts uint64, interval int64, value float64) {
-	msrc, ok := metricOriginsMappings[dimensions.OriginProductDetail()]
-	if !ok {
-		msrc = metrics.MetricSourceOpenTelemetryCollectorUnknown
-	}
+	msrc := getMetricSourceFromDimensions(dimensions)
 	// We should use an empty type instead of a well-known string here,
 	// but this works for now and simplifies the dependency graph.
 	if rateInterval := ctx.Value(otlpmetrics.RateIntervalKey); rateInterval != nil {
@@ -215,9 +224,6 @@ func (c *serializerConsumer) addTelemetryMetric(agentHostname string, params exp
 	buildInfo := params.BuildInfo
 	switch c.ipath {
 	case ddot:
-		for host := range c.hosts {
-			coatUsageMetric.Set(1.0, buildInfo.Version, buildInfo.Command, host, "")
-		}
 		for ecsFargateTag := range c.ecsFargateTags {
 			taskArn := strings.Split(ecsFargateTag, ":")[1]
 			coatUsageMetric.Set(1.0, buildInfo.Version, buildInfo.Command, "", taskArn)

@@ -644,14 +644,26 @@ func (t *defaultTranslator) MapMetrics(ctx context.Context, md pmetric.Metrics, 
 }
 
 func (t *defaultTranslator) mapToDDFormat(ctx context.Context, md pmetric.Metric, consumer Consumer, additionalTags []string, host string, scopeName string, rattrs pcommon.Map) error {
+	originProduct := t.cfg.originProduct
+	originSubProduct := OriginSubProductOTLP
+	originProductDetail := originProductDetailFromScopeName(scopeName)
+	if attrsOriginProduct, ok := rattrs.Get("datadog.metadata.origin_product"); ok {
+		originProduct = OriginProduct(attrsOriginProduct.Int())
+	}
+	if attrsOriginSubProduct, ok := rattrs.Get("datadog.metadata.origin_category"); ok {
+		originSubProduct = OriginSubProduct(attrsOriginSubProduct.Int())
+	}
+	if attrsOriginProductDetail, ok := rattrs.Get("datadog.metadata.origin_service"); ok {
+		originProductDetail = OriginProductDetail(attrsOriginProductDetail.Int())
+	}
 	baseDims := &Dimensions{
 		name:                md.Name(),
 		tags:                additionalTags,
 		host:                host,
 		originID:            attributes.OriginIDFromAttributes(rattrs),
-		originProduct:       t.cfg.originProduct,
-		originSubProduct:    OriginSubProductOTLP,
-		originProductDetail: originProductDetailFromScopeName(scopeName),
+		originProduct:       originProduct,
+		originSubProduct:    originSubProduct,
+		originProductDetail: originProductDetail,
 	}
 	if t.cfg.withUnits {
 		if unit, ok := t.unitMapper.Map(md.Unit()); ok {

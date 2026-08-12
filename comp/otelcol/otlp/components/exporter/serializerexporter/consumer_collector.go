@@ -31,15 +31,10 @@ type collectorConsumer struct {
 
 var _ SerializerConsumer = (*collectorConsumer)(nil)
 
-func (c *collectorConsumer) addRuntimeTelemetryMetric(_ string, languageTags []string) {
+func (c *collectorConsumer) addRuntimeTelemetryMetric(hostname string, languageTags []string) {
 	timestamp := c.getPushTime()
 	buildTags := tagsFromBuildInfo(c.buildInfo)
 	series := c.series
-	for host := range c.seenHosts {
-		// Report the host as running
-		runningMetric := exporterDefaultMetrics("metrics", host, timestamp, buildTags)
-		series = append(series, runningMetric)
-	}
 
 	var nonFargateTags []string
 	for tag := range c.seenTags {
@@ -51,12 +46,12 @@ func (c *collectorConsumer) addRuntimeTelemetryMetric(_ string, languageTags []s
 	}
 	if (len(c.seenHosts) > 0 && len(c.seenTags) == 0) || len(nonFargateTags) > 0 {
 		tags := append(buildTags, nonFargateTags...)
-		series = append(series, exporterDefaultMetrics("metrics", "", timestamp, tags))
+		series = append(series, exporterDefaultMetrics("metrics", hostname, timestamp, tags))
 	}
 
 	for _, lang := range languageTags {
 		tags := append(buildTags, "language:"+lang) //nolint:gocritic
-		runningMetric := exporterDefaultMetrics("runtime_metrics", "", timestamp, tags)
+		runningMetric := exporterDefaultMetrics("runtime_metrics", hostname, timestamp, tags)
 		series = append(series, runningMetric)
 	}
 	c.series = series
