@@ -102,6 +102,9 @@ func newFactoryForAgentWithType(
 	} else {
 		options = append(options, otlpmetrics.WithOTelPrefix())
 	}
+	if featuregates.AttributeSliceMultiTagExportingFeatureGate.IsEnabled() {
+		options = append(options, otlpmetrics.WithEncodeSliceMetadataAsTags())
+	}
 
 	if featuregates.InferIntervalDeltaFeatureGate.IsEnabled() {
 		options = append(options, otlpmetrics.WithInferDeltaInterval())
@@ -149,6 +152,9 @@ func NewFactoryForOSSExporter(typ component.Type, statsIn chan []byte) exp.Facto
 		options = append(options, otlpmetrics.WithoutRuntimeMetricMappings())
 	} else {
 		options = append(options, otlpmetrics.WithRemapping())
+	}
+	if featuregates.AttributeSliceMultiTagExportingFeatureGate.IsEnabled() {
+		options = append(options, otlpmetrics.WithEncodeSliceMetadataAsTags())
 	}
 
 	if featuregates.InferIntervalDeltaFeatureGate.IsEnabled() {
